@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Charlie's 1st Picnic — You're Invited!</title>
+  <meta name="description" content="Join us to celebrate Charlie's first birthday — Sunday, August 23rd at Spoetzl Brewery, Shiner, TX. Please RSVP!" />
+
+  <!-- Social share preview -->
+  <meta property="og:title" content="Charlie's 1st Picnic — You're Invited!" />
+  <meta property="og:description" content="Sunday, August 23rd · 2–4pm · Spoetzl Brewery, Shiner, TX. Please RSVP by August 16." />
+  <meta property="og:image" content="assets/invite.png" />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Parisienne&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>" />
+</head>
+<body>
+  <main class="page">
+
+    <!-- The invitation itself -->
+    <div class="invite-frame">
+      <img src="assets/invite.png" alt="Charlie's 1st Picnic — A year full of blessings, so wonderful and fun! Join us to celebrate Charlie's 1st Picnic. Sunday, August 23rd, 2pm to 4pm, Spoetzl Brewery, 100 Brewery Road, Shiner, Texas 77984." />
+    </div>
+
+    <!-- Quick actions -->
+    <section class="card center">
+      <div class="actions">
+        <a class="btn" id="calBtn" href="#" target="_blank" rel="noopener">🗓️ Add to calendar</a>
+        <a class="btn" id="mapBtn" href="#" target="_blank" rel="noopener">📍 Get directions</a>
+      </div>
+    </section>
+
+    <!-- RSVP form -->
+    <section class="card" id="rsvpCard">
+      <h2 class="script">Will you join us?</h2>
+      <p class="subhead">Kindly reply by August 16</p>
+
+      <form id="rsvpForm" novalidate>
+        <label>Will you be there? <span class="req">*</span></label>
+        <div class="attend">
+          <label class="opt">
+            <input type="radio" name="attending" value="yes" required />
+            <span class="yes">💛 Joyfully accepts</span>
+          </label>
+          <label class="opt">
+            <input type="radio" name="attending" value="no" />
+            <span class="no">🌧️ Regretfully declines</span>
+          </label>
+        </div>
+
+        <label for="name">Your name <span class="req">*</span></label>
+        <input type="text" id="name" name="name" maxlength="100" autocomplete="name" placeholder="e.g. The Smith Family" required />
+
+        <div id="guestWrap">
+          <label for="guests">How many guests? <span class="req">*</span></label>
+          <input type="number" id="guests" name="guests" min="1" max="20" value="1" inputmode="numeric" />
+          <p class="hint">Including yourself and any little ones.</p>
+        </div>
+
+        <label for="contact">Email or phone <span style="font-weight:400;color:#8a7a7d">(optional)</span></label>
+        <input type="text" id="contact" name="contact" maxlength="120" placeholder="So we can reach you with updates" />
+
+        <label for="message">A note for Charlie <span style="font-weight:400;color:#8a7a7d">(optional)</span></label>
+        <textarea id="message" name="message" maxlength="500" placeholder="Well-wishes for the birthday girl…"></textarea>
+
+        <div class="msg error" id="errBox"></div>
+
+        <div class="center" style="margin-top:26px">
+          <button type="submit" class="btn btn-primary" id="submitBtn">Send my RSVP</button>
+        </div>
+      </form>
+
+      <!-- Success -->
+      <div class="thanks" id="thanks">
+        <div class="big">🌸</div>
+        <h2 class="script" id="thanksTitle">Thank you!</h2>
+        <p id="thanksBody"></p>
+      </div>
+    </section>
+
+    <p class="footer-note">We can't wait to celebrate<br />Charlie's first birthday with you!</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    // ---- Calendar + map links ----
+    const EVENT = {
+      title: "Charlie's 1st Picnic",
+      // Aug 23 2026, 2–4pm Central (CDT = UTC-5)
+      startUTC: "20260823T190000Z",
+      endUTC: "20260823T210000Z",
+      location: "Spoetzl Brewery, 100 Brewery Road, Shiner, TX 77984",
+      details: "Join us to celebrate Charlie's first birthday! A year full of blessings, so wonderful and fun.",
+    };
+    document.getElementById("calBtn").href =
+      "https://calendar.google.com/calendar/render?action=TEMPLATE" +
+      "&text=" + encodeURIComponent(EVENT.title) +
+      "&dates=" + EVENT.startUTC + "/" + EVENT.endUTC +
+      "&location=" + encodeURIComponent(EVENT.location) +
+      "&details=" + encodeURIComponent(EVENT.details);
+    document.getElementById("mapBtn").href =
+      "https://maps.google.com/?q=" + encodeURIComponent(EVENT.location);
+
+    // ---- Supabase ----
+    const db = window.supabase.createClient(
+      window.CHARLIE_CONFIG.SUPABASE_URL,
+      window.CHARLIE_CONFIG.SUPABASE_ANON_KEY
+    );
+
+    const form = document.getElementById("rsvpForm");
+    const errBox = document.getElementById("errBox");
+    const guestWrap = document.getElementById("guestWrap");
+    const submitBtn = document.getElementById("submitBtn");
+
+    // Hide guest count when declining
+    form.addEventListener("change", (e) => {
+      if (e.target.name === "attending") {
+        const declining = e.target.value === "no";
+        guestWrap.style.display = declining ? "none" : "block";
+      }
+    });
+
+    function showError(text) {
+      errBox.textContent = text;
+      errBox.classList.add("show");
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errBox.classList.remove("show");
+
+      const attendingEl = form.querySelector('input[name="attending"]:checked');
+      const name = document.getElementById("name").value.trim();
+      if (!attendingEl) return showError("Please let us know if you can make it. 💛");
+      if (!name) return showError("Please add your name so we know who's coming!");
+
+      const attending = attendingEl.value === "yes";
+      let guests = parseInt(document.getElementById("guests").value, 10);
+      if (!attending) guests = 0;
+      if (attending && (!Number.isFinite(guests) || guests < 1)) guests = 1;
+      if (guests > 20) guests = 20;
+
+      const contact = document.getElementById("contact").value.trim() || null;
+      const message = document.getElementById("message").value.trim() || null;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending…";
+
+      const { error } = await db.from("birthday_rsvps").insert({
+        name, attending, guest_count: guests, contact, message,
+      });
+
+      if (error) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Send my RSVP";
+        showError("Something went wrong sending your RSVP. Please try again in a moment.");
+        console.error(error);
+        return;
+      }
+
+      // Success
+      form.style.display = "none";
+      document.querySelector("#rsvpCard .subhead").style.display = "none";
+      document.querySelector("#rsvpCard h2").style.display = "none";
+      const thanks = document.getElementById("thanks");
+      if (attending) {
+        document.getElementById("thanksTitle").textContent = "Yay! See you there!";
+        document.getElementById("thanksBody").textContent =
+          "Your RSVP is in. We're so happy you'll be celebrating Charlie's first birthday with us. 🌸";
+      } else {
+        document.getElementById("thanksTitle").textContent = "We'll miss you!";
+        document.getElementById("thanksBody").textContent =
+          "Thank you for letting us know. We'll be thinking of you on Charlie's special day. 💛";
+      }
+      thanks.classList.add("show");
+      thanks.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  </script>
+</body>
+</html>

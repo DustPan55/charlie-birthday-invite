@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Charlie RSVPs — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Parisienne&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>" />
+</head>
+<body>
+  <main class="page">
+    <h1 class="script">Charlie's RSVPs</h1>
+
+    <!-- Passcode gate -->
+    <section class="card" id="gate">
+      <label for="pass">Enter admin passcode</label>
+      <input type="password" id="pass" placeholder="passcode" autocomplete="current-password" />
+      <div class="msg error" id="gateErr"></div>
+      <div class="center" style="margin-top:20px">
+        <button class="btn btn-primary" id="loadBtn">View responses</button>
+      </div>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dash" style="display:none">
+      <div class="stats">
+        <div class="stat"><div class="num" id="sYes">0</div><div class="lbl">Yes</div></div>
+        <div class="stat"><div class="num" id="sNo">0</div><div class="lbl">No</div></div>
+        <div class="stat"><div class="num" id="sGuests">0</div><div class="lbl">Guests coming</div></div>
+        <div class="stat"><div class="num" id="sTotal">0</div><div class="lbl">Responses</div></div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Reply</th><th>Guests</th><th>Contact</th><th>Note</th><th>When</th></tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="center" style="margin-top:18px">
+          <button class="btn" id="csvBtn">⬇️ Download CSV</button>
+          <button class="btn" id="refreshBtn">↻ Refresh</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    const db = window.supabase.createClient(
+      window.CHARLIE_CONFIG.SUPABASE_URL,
+      window.CHARLIE_CONFIG.SUPABASE_ANON_KEY
+    );
+
+    const gate = document.getElementById("gate");
+    const gateErr = document.getElementById("gateErr");
+    const dash = document.getElementById("dash");
+    let currentPass = "";
+    let currentRows = [];
+
+    async function load(pass) {
+      gateErr.classList.remove("show");
+      const { data, error } = await db.rpc("get_charlie_rsvps", { p_passcode: pass });
+      if (error) {
+        gateErr.textContent = "Incorrect passcode — please try again.";
+        gateErr.classList.add("show");
+        return;
+      }
+      currentPass = pass;
+      currentRows = data || [];
+      render(currentRows);
+      gate.style.display = "none";
+      dash.style.display = "block";
+    }
+
+    function render(rows) {
+      let yes = 0, no = 0, guests = 0;
+      const tbody = document.getElementById("rows");
+      tbody.innerHTML = "";
+      for (const r of rows) {
+        if (r.attending) { yes++; guests += (r.guest_count || 0); } else { no++; }
+        const tr = document.createElement("tr");
+        const cells = [
+          r.name,
+          r.attending
+            ? '<span class="pill yes">Yes</span>'
+            : '<span class="pill no">No</span>',
+          r.attending ? (r.guest_count || 0) : "—",
+          r.contact ? escapeHtml(r.contact) : "—",
+          r.message ? escapeHtml(r.message) : "—",
+          new Date(r.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+        ];
+        tr.innerHTML =
+          "<td>" + escapeHtml(r.name) + "</td>" +
+          "<td>" + cells[1] + "</td>" +
+          "<td>" + cells[2] + "</td>" +
+          "<td>" + cells[3] + "</td>" +
+          "<td>" + cells[4] + "</td>" +
+          "<td>" + cells[5] + "</td>";
+        tbody.appendChild(tr);
+      }
+      document.getElementById("sYes").textContent = yes;
+      document.getElementById("sNo").textContent = no;
+      document.getElementById("sGuests").textContent = guests;
+      document.getElementById("sTotal").textContent = rows.length;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+
+    function toCSV(rows) {
+      const head = ["Name", "Attending", "Guests", "Contact", "Message", "Submitted"];
+      const esc = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+      const lines = [head.map(esc).join(",")];
+      for (const r of rows) {
+        lines.push([
+          r.name, r.attending ? "Yes" : "No", r.attending ? (r.guest_count || 0) : 0,
+          r.contact || "", r.message || "", r.created_at,
+        ].map(esc).join(","));
+      }
+      return lines.join("\r\n");
+    }
+
+    document.getElementById("loadBtn").addEventListener("click", () =>
+      load(document.getElementById("pass").value.trim())
+    );
+    document.getElementById("pass").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") load(document.getElementById("pass").value.trim());
+    });
+    document.getElementById("refreshBtn").addEventListener("click", () => load(currentPass));
+    document.getElementById("csvBtn").addEventListener("click", () => {
+      const blob = new Blob([toCSV(currentRows)], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "charlie-rsvps.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  </script>
+</body>
+</html>
