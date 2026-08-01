@@ -1,4 +1,4 @@
-# Charlie's 1st Picnic 🌸 — Birthday Invite & RSVP
+# Charlie's 1st Picnic — Birthday Invite & RSVP
 
 A single-page birthday invitation for Charlie's first birthday, with live RSVP
 tracking. Share one link with guests; they reply Yes/No, tell you how many are

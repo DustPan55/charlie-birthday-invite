@@ -152,7 +152,6 @@ textarea { resize: vertical; min-height: 80px; }
 /* Success state */
 .thanks { text-align: center; display: none; }
 .thanks.show { display: block; }
-.thanks .big { font-size: 4rem; line-height: 1; }
 
 .footer-note {
   text-align: center; color: var(--rose); font-family: "Parisienne", cursive;
