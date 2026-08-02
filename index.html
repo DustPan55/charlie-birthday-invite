@@ -32,7 +32,7 @@
     <!-- Quick actions -->
     <section class="card center">
       <div class="actions">
-        <a class="btn" id="calBtn" href="#" target="_blank" rel="noopener">Add to calendar</a>
+        <a class="btn" id="calBtn" href="charlie-picnic.ics">Add to calendar</a>
         <a class="btn" id="mapBtn" href="#" target="_blank" rel="noopener">Get directions</a>
       </div>
     </section>
@@ -90,23 +90,12 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
   <script>
-    // ---- Calendar + map links ----
-    const EVENT = {
-      title: "Charlie's 1st Picnic",
-      // Aug 23 2026, 2–4pm Central (CDT = UTC-5)
-      startUTC: "20260823T190000Z",
-      endUTC: "20260823T210000Z",
-      location: "Spoetzl Brewery, 100 Brewery Road, Shiner, TX 77984",
-      details: "Join us to celebrate Charlie's first birthday! A year full of blessings, so wonderful and fun.",
-    };
-    document.getElementById("calBtn").href =
-      "https://calendar.google.com/calendar/render?action=TEMPLATE" +
-      "&text=" + encodeURIComponent(EVENT.title) +
-      "&dates=" + EVENT.startUTC + "/" + EVENT.endUTC +
-      "&location=" + encodeURIComponent(EVENT.location) +
-      "&details=" + encodeURIComponent(EVENT.details);
+    // ---- Map link ----
+    // "Add to calendar" points to charlie-picnic.ics (opens Apple Calendar on
+    // iPhone/Mac; imports into Google/Outlook too).
+    const EVENT_LOCATION = "Spoetzl Brewery, 100 Brewery Road, Shiner, TX 77984";
     document.getElementById("mapBtn").href =
-      "https://maps.google.com/?q=" + encodeURIComponent(EVENT.location);
+      "https://maps.google.com/?q=" + encodeURIComponent(EVENT_LOCATION);
 
     // ---- Supabase ----
     const db = window.supabase.createClient(
