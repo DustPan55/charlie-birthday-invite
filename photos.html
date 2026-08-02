@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Charlie's 1st Picnic — Photo Gallery</title>
+  <meta name="description" content="Share the photos you snapped at Charlie's first birthday!" />
+  <meta property="og:title" content="Charlie's 1st Picnic — Photo Gallery" />
+  <meta property="og:description" content="Share the photos you snapped at Charlie's first birthday!" />
+  <meta property="og:image" content="assets/invite.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Parisienne&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+</head>
+<body>
+  <main class="page">
+    <h1 class="script">Party Photos</h1>
+    <p class="subhead">Charlie's 1st Picnic</p>
+
+    <section class="card uploader">
+      <h2 class="script" style="font-size:1.8rem">Share your snapshots</h2>
+      <p class="center" style="margin-top:-6px;color:#8a7a7d">
+        Add the photos you took at the picnic for everyone to enjoy.
+      </p>
+
+      <label for="files">Choose photos</label>
+      <input type="file" id="files" accept="image/*" multiple />
+
+      <label for="uname">Your name <span style="font-weight:400;color:#8a7a7d">(optional)</span></label>
+      <input type="text" id="uname" maxlength="80" placeholder="So we know who to thank" />
+
+      <label for="cap">Caption <span style="font-weight:400;color:#8a7a7d">(optional, applies to this batch)</span></label>
+      <input type="text" id="cap" maxlength="300" placeholder="e.g. Cake time!" />
+
+      <div class="progress-wrap" id="progWrap">
+        <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+      </div>
+      <div class="upload-status" id="status"></div>
+
+      <div class="center" style="margin-top:18px">
+        <button class="btn btn-primary" id="uploadBtn" disabled>Upload photos</button>
+      </div>
+    </section>
+
+    <section id="gallerySection">
+      <div class="divider">Gallery</div>
+      <div class="gallery" id="gallery"></div>
+      <p class="gallery-empty" id="galleryEmpty">No photos yet — be the first to add one!</p>
+    </section>
+
+    <p class="center" style="margin-top:28px">
+      <a class="btn" href="index.html">← Back to the invite</a>
+    </p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+    const BUCKET = "charlie-photos";
+    const db = window.supabase.createClient(
+      window.CHARLIE_CONFIG.SUPABASE_URL,
+      window.CHARLIE_CONFIG.SUPABASE_ANON_KEY
+    );
+
+    const filesEl = document.getElementById("files");
+    const unameEl = document.getElementById("uname");
+    const capEl = document.getElementById("cap");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const statusEl = document.getElementById("status");
+    const progWrap = document.getElementById("progWrap");
+    const progFill = document.getElementById("progFill");
+    const gallery = document.getElementById("gallery");
+    const galleryEmpty = document.getElementById("galleryEmpty");
+
+    // Remember the uploader's name between visits
+    unameEl.value = localStorage.getItem("charlie_uploader_name") || "";
+
+    filesEl.addEventListener("change", () => {
+      uploadBtn.disabled = filesEl.files.length === 0;
+      statusEl.textContent = filesEl.files.length
+        ? `${filesEl.files.length} photo${filesEl.files.length > 1 ? "s" : ""} ready`
+        : "";
+    });
+
+    // Downscale + compress an image file to a JPEG blob (~max 1600px, quality 0.82)
+    async function compress(file, maxSide = 1600, quality = 0.82) {
+      let bmp;
+      try {
+        bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      } catch (e) {
+        bmp = await new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = URL.createObjectURL(file);
+        });
+      }
+      const w = bmp.width, h = bmp.height;
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      const cw = Math.round(w * scale), ch = Math.round(h * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = cw; canvas.height = ch;
+      canvas.getContext("2d").drawImage(bmp, 0, 0, cw, ch);
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", quality));
+      return blob || file; // fall back to original if toBlob unsupported
+    }
+
+    function publicUrl(path) {
+      return db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+
+    function addToGallery(row, prepend) {
+      galleryEmpty.style.display = "none";
+      const fig = document.createElement("figure");
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.src = publicUrl(row.storage_path);
+      img.alt = row.caption || "Party photo";
+      fig.appendChild(img);
+      if (row.caption || row.uploader_name) {
+        const cap = document.createElement("figcaption");
+        cap.innerHTML =
+          (row.caption ? escapeHtml(row.caption) : "") +
+          (row.uploader_name ? ` <span class="who">— ${escapeHtml(row.uploader_name)}</span>` : "");
+        fig.appendChild(cap);
+      }
+      if (prepend && gallery.firstChild) gallery.insertBefore(fig, gallery.firstChild);
+      else gallery.appendChild(fig);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+
+    async function loadGallery() {
+      const { data, error } = await db
+        .from("party_photos").select("*").order("created_at", { ascending: false });
+      if (error) { console.error(error); return; }
+      if (!data || !data.length) { galleryEmpty.style.display = "block"; return; }
+      gallery.innerHTML = "";
+      data.forEach((row) => addToGallery(row, false));
+    }
+
+    uploadBtn.addEventListener("click", async () => {
+      const files = Array.from(filesEl.files);
+      if (!files.length) return;
+      const name = unameEl.value.trim() || null;
+      const caption = capEl.value.trim() || null;
+      if (name) localStorage.setItem("charlie_uploader_name", name);
+
+      uploadBtn.disabled = true;
+      filesEl.disabled = true;
+      progWrap.classList.add("show");
+      let done = 0, failed = 0;
+
+      for (const file of files) {
+        statusEl.textContent = `Uploading ${done + 1} of ${files.length}…`;
+        try {
+          if (!file.type.startsWith("image/")) throw new Error("not an image");
+          const blob = await compress(file);
+          const path = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.round(1e9 * Math.random())) + ".jpg";
+          const up = await db.storage.from(BUCKET).upload(path, blob, {
+            contentType: "image/jpeg", upsert: false,
+          });
+          if (up.error) throw up.error;
+          const ins = await db.from("party_photos").insert({
+            storage_path: path, uploader_name: name, caption: caption,
+          });
+          if (ins.error) throw ins.error;
+          addToGallery({ storage_path: path, uploader_name: name, caption: caption }, true);
+        } catch (e) {
+          console.error("upload failed for", file.name, e);
+          failed++;
+        }
+        done++;
+        progFill.style.width = Math.round((done / files.length) * 100) + "%";
+      }
+
+      progWrap.classList.remove("show");
+      progFill.style.width = "0";
+      filesEl.value = "";
+      filesEl.disabled = false;
+      uploadBtn.disabled = true;
+      capEl.value = "";
+      statusEl.textContent = failed
+        ? `Uploaded ${done - failed} of ${files.length}. ${failed} couldn't be added — please try again.`
+        : `Thank you! ${done} photo${done > 1 ? "s" : ""} added. 🌸`.replace(" 🌸", "");
+    });
+
+    loadGallery();
+  </script>
+</body>
+</html>

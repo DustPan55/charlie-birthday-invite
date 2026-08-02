@@ -13,10 +13,24 @@ a private, passcode-protected admin page.
 | File          | Purpose                                                        |
 |---------------|---------------------------------------------------------------|
 | `index.html`  | The public invitation + RSVP form (share this link)           |
+| `photos.html` | Open photo gallery — guests upload pics, everyone sees them    |
 | `admin.html`  | Private RSVP dashboard (passcode-gated)                        |
 | `config.js`   | Supabase URL + anon key                                        |
 | `styles.css`  | Shared vintage-gingham styling                                 |
+| `charlie-picnic.ics` | Calendar file for the "Add to calendar" button         |
 | `assets/`     | The invitation artwork                                         |
+
+## Photo gallery
+
+`photos.html` is an open gallery: guests pick photos, they're compressed in the
+browser (max ~1600px, JPEG) and uploaded to a **public Supabase Storage bucket**
+(`charlie-photos`), with a row in `party_photos` (path + optional name/caption).
+Everyone sees uploads instantly. Reachable from the invite ("Share your photos")
+and the RSVP thank-you screen.
+
+Anon can **upload and view** but **not delete**. To remove an unwanted photo,
+use the Supabase dashboard → Storage (`charlie-photos`) and Table editor
+(`party_photos`).
 
 ## How it works
 
